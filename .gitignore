@@ -1,6 +1,7 @@
 # Build output
 bin/
 obj/
+out/
 
 # Visual Studio
 .vs/
@@ -9,10 +10,13 @@ obj/
 *.userosscache
 *.sln.docstates
 
+# Rider
+.idea/
+
 # VS Code
 .vscode/
 
-# Local config
+# Local config (developer overrides; no secrets committed)
 appsettings.Development.json
 appsettings.Local.json
 
@@ -25,6 +29,10 @@ coverage/
 # NuGet
 *.nupkg
 *.snupkg
+
+# Runtime data files produced by the application
+audit_store.json
+dead_letter_events.json
 
 # OS
 .DS_Store

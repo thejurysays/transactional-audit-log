@@ -1,7 +1,7 @@
 # Assignment Project
 
 ## Current Phase
-SPEC — extract requirements into docs/spec.md only. Do not suggest implementation details, architecture, or code.
+IMPLEMENTATION — follow all rules below.
 
 ## Stack
 - Language: C# (.NET 8)
