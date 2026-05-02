@@ -105,3 +105,6 @@ IMPLEMENTATION — follow all rules below.
 - docs/decisions.md shows reasoning and tradeoffs behind key choices
 - README.md is accurate and the project runs from scratch following it
 - Code is readable — a reviewer should understand each method without tracing its callers
+
+## .NET Review Guidelines
+- Verify that LINQ queries are optimized for Big O notation and avoid 'N+1' issues.
