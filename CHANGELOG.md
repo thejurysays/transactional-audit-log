@@ -6,6 +6,19 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-02
+### Added
+- `IngestEventRequest` model — `EventId` (optional, for idempotency), required `ActorId`, `ActionType`, `ResourceType`, `ResourceId`, and optional `Before`/`After` (`JsonObject?`) fields
+- `AuditEntryResponse` model — all `AuditEntry` fields with `Payload` deserialized as `JsonElement` (structured JSON, not a raw string)
+- `DeadLetterEntry` model — `FailedAt`, `Reason`, and original `IngestEventRequest` (used by Slice 5 dead-letter store)
+- `Result<T>` — lightweight discriminated union (`IsSuccess` computed from `Error`); `ResultErrorType` enum (`Validation`, `Conflict`, `NotFound`); no library dependency
+- `DiffEngine` — computes structured field-level diffs between `before`/`after` `JsonObject` payloads; uses two-pass iteration (no intermediate `HashSet` allocation); unchanged fields excluded; null↔value transitions handled
+- `IAuditService` / `AuditService` — orchestrates ingestion: idempotency check → payload computation (diff for updates, full snapshot for create/delete) → persist; logs `Warning` on duplicate event rejection
+- `AuditEventsController` — `POST /api/v1/audit/events`; returns 201 Created, 400 Bad Request, or 409 Conflict; rate-limited via `RateLimitPolicies.Fixed`
+- `StubAuditRepository` backing store changed from `List<AuditEntry>` to `Dictionary<Guid, AuditEntry>` — O(1) ID lookup for `FindByIdAsync` and `TryAdd` idempotency check
+- Unit tests: `DiffEngine` — changed field, unchanged excluded, null→value, value→null, empty diff, multiple changes, null-guard throws (8 cases)
+- Integration tests: `AuditEventsController` — create/update/delete happy paths, missing required field, both-before-and-after-null, duplicate EventId 409, auto-assigned ID (7 cases)
+
 ## [0.1.0] - 2026-04-26
 ### Added
 - Solution file and dual-project layout (`TransactionalAuditLog` API + `TransactionalAuditLog.Tests`)

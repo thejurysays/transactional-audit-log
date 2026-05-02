@@ -5,6 +5,7 @@ using TransactionalAuditLog.Configuration;
 using TransactionalAuditLog.Exceptions;
 using TransactionalAuditLog.Middleware;
 using TransactionalAuditLog.Repositories;
+using TransactionalAuditLog.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -51,6 +52,9 @@ if (useStub)
 else
     throw new InvalidOperationException(
         "Real repository not yet implemented. Set Features:UseStubRepository=true in appsettings.json.");
+
+builder.Services.AddSingleton<DiffEngine>();
+builder.Services.AddScoped<IAuditService, AuditService>();
 
 var app = builder.Build();
 

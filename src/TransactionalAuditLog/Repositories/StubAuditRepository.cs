@@ -4,14 +4,16 @@ namespace TransactionalAuditLog.Repositories;
 
 public sealed class StubAuditRepository : IAuditRepository
 {
-    private readonly List<AuditEntry> _entries = [];
+    // Dictionary keyed by entry ID gives O(1) lookup for FindByIdAsync and TryAdd, versus O(n) linear scan on a List.
+    private readonly Dictionary<Guid, AuditEntry> _entries = [];
     private readonly object _lock = new();
 
     public Task<AuditEntry?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         lock (_lock)
         {
-            return Task.FromResult(_entries.FirstOrDefault(e => e.Id == id));
+            _entries.TryGetValue(id, out var entry);
+            return Task.FromResult(entry);
         }
     }
 
@@ -20,10 +22,7 @@ public sealed class StubAuditRepository : IAuditRepository
         ArgumentNullException.ThrowIfNull(entry);
         lock (_lock)
         {
-            if (_entries.Any(e => e.Id == entry.Id))
-                return Task.CompletedTask;
-
-            _entries.Add(entry);
+            _entries.TryAdd(entry.Id, entry);
         }
         return Task.CompletedTask;
     }
@@ -44,7 +43,7 @@ public sealed class StubAuditRepository : IAuditRepository
     {
         lock (_lock)
         {
-            IReadOnlyList<AuditEntry> results = _entries
+            IReadOnlyList<AuditEntry> results = _entries.Values
                 .Where(predicate)
                 .OrderByDescending(e => e.Timestamp)
                 .ToList();
