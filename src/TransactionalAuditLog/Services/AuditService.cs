@@ -57,4 +57,38 @@ public sealed class AuditService(
 
         return Result<AuditEntryResponse>.Success(AuditEntryResponse.From(entry));
     }
+
+    public async Task<Result<IReadOnlyList<AuditEntryResponse>>> SearchAsync(
+        string? actorId,
+        string? resourceType,
+        CancellationToken cancellationToken = default)
+    {
+        var hasActor    = !string.IsNullOrWhiteSpace(actorId);
+        var hasResource = !string.IsNullOrWhiteSpace(resourceType);
+
+        if (!hasActor && !hasResource)
+            return Result<IReadOnlyList<AuditEntryResponse>>.Failure(
+                "Exactly one of 'actor_id' or 'resource_type' must be provided.",
+                ResultErrorType.Validation);
+
+        if (hasActor && hasResource)
+            return Result<IReadOnlyList<AuditEntryResponse>>.Failure(
+                "Provide either 'actor_id' or 'resource_type', not both.",
+                ResultErrorType.Validation);
+
+        var (filterName, filterValue) = hasActor
+            ? ("actor_id",      actorId!)
+            : ("resource_type", resourceType!);
+
+        IReadOnlyList<AuditEntry> entries = hasActor
+            ? await repository.SearchByActorAsync(filterValue, cancellationToken)
+            : await repository.SearchByResourceTypeAsync(filterValue, cancellationToken);
+
+        logger.LogInformation(
+            "Audit search completed. Filter={Filter} Value={Value} Count={Count}",
+            filterName, filterValue, entries.Count);
+
+        return Result<IReadOnlyList<AuditEntryResponse>>.Success(
+            entries.Select(AuditEntryResponse.From).ToList());
+    }
 }

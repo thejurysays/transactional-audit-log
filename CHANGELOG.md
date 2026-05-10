@@ -6,6 +6,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-09
+### Added
+- `GET /api/v1/audit` search endpoint — returns `AuditEntryResponse[]` ordered most-recent-first; accepts exactly one of `actor_id` or `resource_type` as a query parameter; returns 400 with `ProblemDetails` if neither or both are supplied
+- `IAuditService.SearchAsync` — routes to the appropriate repository method based on the supplied filter; validates mutual exclusivity of `actor_id` / `resource_type`; uses `IsNullOrWhiteSpace` to treat blank query strings as absent
+- `AuditController` — thin controller at `api/v1/audit`; rate-limited via `RateLimitPolicies.Fixed`; delegates all validation to `AuditService`
+- Integration tests: `AuditController` — search by actor_id, search by resource_type, empty result set, neither param (400), both params (400), multiple entries ordered newest-first (6 cases)
+
 ## [0.2.0] - 2026-05-02
 ### Added
 - `IngestEventRequest` model — `EventId` (optional, for idempotency), required `ActorId`, `ActionType`, `ResourceType`, `ResourceId`, and optional `Before`/`After` (`JsonObject?`) fields
