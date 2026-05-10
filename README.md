@@ -1,24 +1,96 @@
-# Practice Exercise 3: The "Transactional Audit Log"
-## The Scenario:
-Jane App handles sensitive medical and financial data. Every time a "Record" (like a Patient Note or an Invoice) is created, updated, or deleted, the system must generate an immutable audit log.
+# Transactional Audit Log
 
-## The Task:
-Build a backend service that intercepts "Events" and persists them into a searchable Audit Store.
+A .NET 8 ASP.NET Core Web API that captures immutable audit events for clinic actions, computes structured field-level diffs for updates, and exposes a searchable audit trail.
 
-## The Requirements:
+## Prerequisites
 
-### The Event Producer: 
-Create a simple interface that simulates "Actions" being taken in a clinic (e.g., PatientUpdated, AppointmentCancelled).
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 
-### The Audit Service: 
-Capture the Timestamp, ActorID, ActionType, and a Payload (the data that changed).
+## Setup
 
-### The "Architect" Twist: Implement a "Diffing" logic. 
-If a Patient's phone number changes from A to B, the audit log should store the specific change, not just the whole new object.
+1. Copy the example configuration:
+   ```bash
+   cp src/TransactionalAuditLog/appsettings.example.json src/TransactionalAuditLog/appsettings.json
+   ```
 
-### Search & Retrieval:
-Expose an API endpoint GET /audit?actor_id=123 or GET /audit?resource_type=Patient.
-The results must be returned in reverse chronological order.
+2. Review `appsettings.json` — the defaults work out of the box for local development with the in-memory stub repository.
 
-### Resiliency: 
-Implement a basic "Retry" mechanism or a "Dead Letter" concept. If the Audit Store (e.g., a mock database or file) is "locked" or fails, how does your service handle the event so it isn't lost?
+## Running the API
+
+```bash
+dotnet run --project src/TransactionalAuditLog
+```
+
+- API base URL: `http://localhost:5000`
+- Swagger UI: `http://localhost:5000/swagger`
+- Health check: `http://localhost:5000/health`
+
+## Running Tests
+
+```bash
+dotnet test src/TransactionalAuditLog.Tests
+```
+
+## Configuration
+
+### Feature Flags
+
+| Flag | Default | Description |
+|---|---|---|
+| `Features:UseStubRepository` | `true` | `true` uses the in-memory stub repository; `false` requires the file-backed repository (available from v0.4.0) |
+
+Override via environment variable (useful in containers):
+```bash
+Features__UseStubRepository=true
+```
+
+### Storage
+
+| Key | Default | Description |
+|---|---|---|
+| `Storage:AuditFilePath` | `audit_store.json` | Path to the newline-delimited JSON audit store (used when `UseStubRepository=false`) |
+| `Storage:DeadLetterFilePath` | `dead_letter_events.json` | Path to the dead-letter file for events that fail after retries (used from v0.5.0) |
+
+### CORS
+
+Allowed origins are configured under `Cors:AllowedOrigins`. The default allows `http://localhost:3000`.
+
+## API Reference
+
+### POST /api/v1/audit/events
+
+Ingest a new audit event. Supply an optional `EventId` (UUID) for idempotent retries — submitting the same `EventId` twice returns 409 rather than creating a duplicate.
+
+**Request body:**
+```json
+{
+  "eventId": "optional-uuid",
+  "actorId": "user-123",
+  "actionType": "PatientUpdated",
+  "resourceType": "Patient",
+  "resourceId": "patient-456",
+  "before": { "phone": "555-1234" },
+  "after":  { "phone": "555-5678" }
+}
+```
+
+- Omit `before` for create events (payload will be the full `after` object).
+- Omit `after` for delete events (payload will be the full `before` object).
+- Supply both for update events (payload will be a structured field-level diff).
+
+**Responses:** `201 Created` · `400 Bad Request` · `409 Conflict`
+
+### GET /api/v1/audit
+
+Search audit entries. Exactly one query parameter must be supplied. Results are ordered most-recent-first.
+
+```
+GET /api/v1/audit?actor_id=user-123
+GET /api/v1/audit?resource_type=Patient
+```
+
+**Responses:** `200 OK` · `400 Bad Request`
+
+### GET /health
+
+Returns `200 Healthy` when the service is running.

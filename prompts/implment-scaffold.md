@@ -21,4 +21,6 @@ Read CLAUDE.md and docs/design.md.
 # Human Questions
 - /simplify
 - /security-review
+- update Readme.md with slice 1 work
+- is there any thing from slice 1 that should have a decision.md entry?
 - update the CHANGELOG.md 

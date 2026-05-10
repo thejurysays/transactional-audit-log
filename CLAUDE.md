@@ -52,6 +52,7 @@ IMPLEMENTATION — follow all rules below.
 - Correct log levels — Debug for diagnostics, Information for business events, Warning for recoverable issues, Error for failures
 - Correlation ID middleware so all statements within a request share a traceable identifier
 - Enrich all logs globally in Program.cs with machine name, environment name, and app version
+- Always configure a Serilog file sink — logs must be written to a rolling file (e.g. logs/app-.log) in addition to the console; use Serilog.Sinks.File with rollingInterval: RollingInterval.Day
 
 ## Testing
 - Unit tests for domain and service logic; integration tests via WebApplicationFactory<T> for API endpoints
@@ -68,6 +69,7 @@ IMPLEMENTATION — follow all rules below.
 - Separate concerns: domain logic out of controllers and data access layer
 - Depend on interfaces, not concrete implementations
 - Patterns emerge from the problem — never imposed for their own sake
+- Add a comment wherever a reader would need to stop and reason to understand why — hidden constraints, non-obvious invariants, algorithm choices, or workarounds for specific bugs; omit comments where well-named identifiers already communicate intent
 
 ## Stub Repository Pattern
 - Use stub repositories to keep API slices independently mergeable before the real DB implementation exists

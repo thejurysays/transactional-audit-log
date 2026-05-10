@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-Jane App handles sensitive medical and financial data. Whenever a Record (such as a Patient Note or Invoice) is created, updated, or deleted, the system must generate an immutable audit log capturing who performed the action, when it occurred, what type of action it was, and exactly what changed. This project delivers a backend service that accepts those events, persists them to a durable Audit Store, records only the precise field-level changes for update events rather than the entire object, exposes the stored entries for search and retrieval, and ensures no event is silently lost if the Audit Store is temporarily unavailable.
+The company handles sensitive medical and financial data. Whenever a Record (such as a Patient Note or Invoice) is created, updated, or deleted, the system must generate an immutable audit log capturing who performed the action, when it occurred, what type of action it was, and exactly what changed. This project delivers a backend service that accepts those events, persists them to a durable Audit Store, records only the precise field-level changes for update events rather than the entire object, exposes the stored entries for search and retrieval, and ensures no event is silently lost if the Audit Store is temporarily unavailable.
 
 ## Functional Requirements
 
