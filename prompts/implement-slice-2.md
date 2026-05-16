@@ -1,5 +1,6 @@
 # TODO
 Change the Claude.md file to: IMPLEMENTATION — follow all rules below.
+- Use /compact on previous session
 - change to /plan mode, make sure effort is high
 
 # Claude Code Prompt

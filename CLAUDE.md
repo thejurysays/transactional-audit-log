@@ -25,8 +25,9 @@ IMPLEMENTATION — follow all rules below.
 - Never implement beyond the current slice's scope
 - Keep PRs under 300 lines of diff
 - When making a non-obvious technical decision, append it to docs/decisions.md
-- At the end of each slice, remind me to run /simplify, /security-review, and /review before updating any docs
-- After I confirm the code is ready, update CHANGELOG.md, bump the version in the .csproj, and update README.md if any new setup steps, environment variables, or feature flags were added — stop before committing, I will review and commit
+- At the end of each slice, remind me to run /simplify and /security-review before updating any docs
+- After /simplify and /security-review are complete, update CHANGELOG.md, bump the version in the .csproj, update README.md if any new setup steps, environment variables, or feature flags were added, and append to docs/decisions.md for any non-obvious decisions made during review — stop before committing, I will review and commit
+- After all docs are updated, remind me to run /review as the final step before committing
 - After I confirm the slice is ready, display the git add, git commit, git push, and gh pr create commands for me to copy and run — do not run them
 - Commit messages must: use conventional commits (feat:, fix:, chore:, test:), use imperative mood, explain why the change was necessary and any side effects, be atomic
 

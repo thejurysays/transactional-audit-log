@@ -7,6 +7,7 @@ namespace TransactionalAuditLog.Services;
 public sealed class AuditService(
     IAuditRepository repository,
     DiffEngine diffEngine,
+    LogPseudonymizer pseudonymizer,
     ILogger<AuditService> logger) : IAuditService
 {
     public async Task<Result<AuditEntryResponse>> IngestAsync(
@@ -52,8 +53,11 @@ public sealed class AuditService(
         await repository.SaveAsync(entry, cancellationToken);
 
         logger.LogInformation(
-            "Audit event ingested {EventId} by actor {ActorId} for {ResourceType}/{ResourceId}",
-            id, request.ActorId, request.ResourceType, request.ResourceId);
+            "Audit event ingested {EventId} by actor {ActorIdHash} for {ResourceType}/{ResourceIdHash}",
+            id,
+            pseudonymizer.Pseudonymize(request.ActorId),
+            request.ResourceType,
+            pseudonymizer.Pseudonymize(request.ResourceId));
 
         return Result<AuditEntryResponse>.Success(AuditEntryResponse.From(entry));
     }
@@ -84,9 +88,10 @@ public sealed class AuditService(
             ? await repository.SearchByActorAsync(filterValue, cancellationToken)
             : await repository.SearchByResourceTypeAsync(filterValue, cancellationToken);
 
+        var logValue = hasActor ? pseudonymizer.Pseudonymize(filterValue) : filterValue;
         logger.LogInformation(
             "Audit search completed. Filter={Filter} Value={Value} Count={Count}",
-            filterName, filterValue, entries.Count);
+            filterName, logValue, entries.Count);
 
         return Result<IReadOnlyList<AuditEntryResponse>>.Success(
             entries.Select(AuditEntryResponse.From).ToList());
