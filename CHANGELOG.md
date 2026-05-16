@@ -6,6 +6,19 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-16
+### Added
+- `AuditRepository` — file-backed implementation of `IAuditRepository`; appends one NDJSON line per entry to the path configured at `Storage:AuditFilePath`; reads load and filter the full file in memory; `SemaphoreSlim(1,1)` serialises all concurrent reads and writes including the file-existence check
+- `LogPseudonymizer` — HMAC-SHA256 service that maps PII fields (`ActorId`, `ResourceId`) to a stable 16-character hex pseudonym for operational logs; same input always produces the same pseudonym enabling log correlation; requires `Logging:PseudonymKey` to be set at startup (throws `InvalidOperationException` if absent)
+- Integration tests: `AuditRepositoryIntegrationTests` — repeats all Slice 2–3 scenarios against the real file-backed store via `FileBackedWebApplicationFactory`; temp file is created and deleted per test class; covers create, update, duplicate 409, physical file persistence, search by actor, search by resource type, empty results, reverse-chronological order, and 400 validation cases (10 cases)
+- `appsettings.example.json` — documents the required `Logging:PseudonymKey` field
+
+### Changed
+- `AuditService` — `ActorId` and `ResourceId` are now pseudonymized in all log statements via `LogPseudonymizer`; raw PII no longer appears in operational logs
+- `Program.cs` — registers `AuditRepository` as the live singleton when `Features:UseStubRepository` is `false`; registers `LogPseudonymizer` as a singleton
+- `docs/decisions.md` — ADR-018 (WebApplicationFactory `ConfigureServices` vs `ConfigureAppConfiguration`), ADR-019 (HMAC pseudonymization for log PII)
+- `README.md` — documents `Logging:PseudonymKey` configuration, production override, and key-rotation behaviour
+
 ## [0.3.0] - 2026-05-09
 ### Added
 - `GET /api/v1/audit` search endpoint — returns `AuditEntryResponse[]` ordered most-recent-first; accepts exactly one of `actor_id` or `resource_type` as a query parameter; returns 400 with `ProblemDetails` if neither or both are supplied

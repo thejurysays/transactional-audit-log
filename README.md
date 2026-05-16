@@ -51,6 +51,19 @@ Features__UseStubRepository=true
 | `Storage:AuditFilePath` | `audit_store.json` | Path to the newline-delimited JSON audit store (used when `UseStubRepository=false`) |
 | `Storage:DeadLetterFilePath` | `dead_letter_events.json` | Path to the dead-letter file for events that fail after retries (used from v0.5.0) |
 
+### Logging
+
+| Key | Default | Description |
+|---|---|---|
+| `Logging:PseudonymKey` | *(dev key in appsettings.json)* | HMAC-SHA256 key used to pseudonymize PII fields (`ActorId`, `ResourceId`) in operational logs. **Must be overridden in production.** Same key produces the same pseudonym, enabling log correlation without exposing raw values. |
+
+Override via environment variable in production:
+```bash
+Logging__PseudonymKey=<strong-random-secret>
+```
+
+> **Note:** Rotating this key breaks cross-session log correlation — treat it as long-lived. If the key is absent at startup the service will not start.
+
 ### CORS
 
 Allowed origins are configured under `Cors:AllowedOrigins`. The default allows `http://localhost:3000`.

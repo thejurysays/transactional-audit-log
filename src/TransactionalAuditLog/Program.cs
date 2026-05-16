@@ -50,10 +50,10 @@ var useStub = builder.Configuration.GetValue<bool>("Features:UseStubRepository")
 if (useStub)
     builder.Services.AddSingleton<IAuditRepository, StubAuditRepository>();
 else
-    throw new InvalidOperationException(
-        "Real repository not yet implemented. Set Features:UseStubRepository=true in appsettings.json.");
+    builder.Services.AddSingleton<IAuditRepository, AuditRepository>();
 
 builder.Services.AddSingleton<DiffEngine>();
+builder.Services.AddSingleton<LogPseudonymizer>();
 builder.Services.AddScoped<IAuditService, AuditService>();
 
 var app = builder.Build();
