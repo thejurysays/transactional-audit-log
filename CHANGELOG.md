@@ -6,6 +6,22 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-27
+### Added
+- `IDeadLetterStore` / `DeadLetterStore` — append-only NDJSON store for events that fail to persist; one line per `DeadLetterEntry`; `SemaphoreSlim(1,1)` serialises concurrent appends; file path configured via `Storage:DeadLetterFilePath`
+- Named resilience pipeline `audit-save` (`Microsoft.Extensions.Resilience` 8.10.0) wrapping `IAuditRepository.SaveAsync` — `MaxRetryAttempts = 1`, 200ms constant delay (two total attempts, satisfying FR-8 "retry at least once")
+- `ResiliencePipelines.AuditSave` constant (mirrors `RateLimitPolicies`) — no magic strings
+- Unit tests: `AuditServiceResiliencyTests` — retry succeeds on second attempt (no dead-letter), retry exhaustion routes to dead-letter and returns `ServiceUnavailable` (2 cases)
+- Integration test: `AuditResiliencyIntegrationTests` — `FailingStoreWebApplicationFactory` swaps `IAuditRepository` for an always-throwing fake and points `DeadLetterStore` at a temp file; verifies `POST` returns 503 and the dead-letter file contains the event
+
+### Changed
+- `AuditService` — `SaveAsync` is now executed inside the named resilience pipeline; on retry exhaustion the request is captured in the dead-letter store and a `ServiceUnavailable` result is returned. `OperationCanceledException` is re-thrown rather than dead-lettered so caller cancellation is not treated as a store failure; the dead-letter write uses `CancellationToken.None` so the durability backstop completes even if the caller's token cancels mid-flight. `DeadLetterEntry.Reason` records `"{ExceptionType}: {Message}"` for triage
+- `ResultErrorType` — adds `ServiceUnavailable`
+- `AuditEventsController` — maps `ResultErrorType.ServiceUnavailable` → `503 Service Unavailable` with sanitised `ProblemDetails`; the underlying exception message is not exposed to the caller
+- `Program.cs` — registers `IDeadLetterStore` as a singleton and adds the `audit-save` resilience pipeline
+- `docs/decisions.md` — ADR-020 (retry orchestration in `AuditService`, no separate `ResiliencyPolicy` class), ADR-021 (`MaxRetryAttempts = 1` — minimal "retry at least once"; dead-letter is the durability backstop), ADR-022 (cancellation semantics: re-throw `OperationCanceledException`; dead-letter write uses `CancellationToken.None`)
+- `README.md` — documents the retry / dead-letter behaviour and the new 503 response
+
 ## [0.4.0] - 2026-05-16
 ### Added
 - `AuditRepository` — file-backed implementation of `IAuditRepository`; appends one NDJSON line per entry to the path configured at `Storage:AuditFilePath`; reads load and filter the full file in memory; `SemaphoreSlim(1,1)` serialises all concurrent reads and writes including the file-existence check

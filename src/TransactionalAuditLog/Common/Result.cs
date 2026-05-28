@@ -18,5 +18,6 @@ public enum ResultErrorType
 {
     Validation,
     Conflict,
-    NotFound
+    NotFound,
+    ServiceUnavailable
 }
