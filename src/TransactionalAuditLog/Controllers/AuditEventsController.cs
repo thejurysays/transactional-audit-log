@@ -21,6 +21,7 @@ public sealed class AuditEventsController(IAuditService auditService) : Controll
     [ProducesResponseType(typeof(AuditEntryResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> IngestAsync(
         [FromBody] IngestEventRequest request,
         CancellationToken cancellationToken)
@@ -43,6 +44,14 @@ public sealed class AuditEventsController(IAuditService auditService) : Controll
                     Title = "Validation failed.",
                     Detail = result.Error
                 }),
+                ResultErrorType.ServiceUnavailable => StatusCode(
+                    StatusCodes.Status503ServiceUnavailable,
+                    new ProblemDetails
+                    {
+                        Status = StatusCodes.Status503ServiceUnavailable,
+                        Title = "Audit store unavailable.",
+                        Detail = result.Error
+                    }),
                 _ => StatusCode(StatusCodes.Status500InternalServerError)
             };
         }

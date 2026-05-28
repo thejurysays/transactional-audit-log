@@ -1,6 +1,8 @@
 using System.Reflection;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using Polly;
+using Polly.Retry;
 using TransactionalAuditLog.Configuration;
 using TransactionalAuditLog.Exceptions;
 using TransactionalAuditLog.Middleware;
@@ -54,6 +56,20 @@ else
 
 builder.Services.AddSingleton<DiffEngine>();
 builder.Services.AddSingleton<LogPseudonymizer>();
+builder.Services.AddSingleton<IDeadLetterStore, DeadLetterStore>();
+
+// Retry pipeline for audit-store writes: one retry (two total attempts) satisfies FR-8's
+// "retry at least once"; dead-letter is the durability backstop, not aggressive retrying.
+builder.Services.AddResiliencePipeline(ResiliencePipelines.AuditSave, pipeline =>
+{
+    pipeline.AddRetry(new RetryStrategyOptions
+    {
+        MaxRetryAttempts = 1,
+        Delay = TimeSpan.FromMilliseconds(200),
+        BackoffType = DelayBackoffType.Constant
+    });
+});
+
 builder.Services.AddScoped<IAuditService, AuditService>();
 
 var app = builder.Build();
@@ -79,4 +95,9 @@ public partial class Program { }
 public static class RateLimitPolicies
 {
     public const string Fixed = "fixed";
+}
+
+public static class ResiliencePipelines
+{
+    public const string AuditSave = "audit-save";
 }

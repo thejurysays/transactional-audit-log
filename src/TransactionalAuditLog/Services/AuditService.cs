@@ -1,15 +1,43 @@
+using Polly;
+using Polly.Registry;
 using TransactionalAuditLog.Common;
 using TransactionalAuditLog.Models;
 using TransactionalAuditLog.Repositories;
 
 namespace TransactionalAuditLog.Services;
 
-public sealed class AuditService(
-    IAuditRepository repository,
-    DiffEngine diffEngine,
-    LogPseudonymizer pseudonymizer,
-    ILogger<AuditService> logger) : IAuditService
+public sealed class AuditService : IAuditService
 {
+    private readonly IAuditRepository _repository;
+    private readonly DiffEngine _diffEngine;
+    private readonly LogPseudonymizer _pseudonymizer;
+    private readonly IDeadLetterStore _deadLetterStore;
+    private readonly ILogger<AuditService> _logger;
+    private readonly ResiliencePipeline _savePipeline;
+
+    public AuditService(
+        IAuditRepository repository,
+        DiffEngine diffEngine,
+        LogPseudonymizer pseudonymizer,
+        IDeadLetterStore deadLetterStore,
+        ResiliencePipelineProvider<string> pipelineProvider,
+        ILogger<AuditService> logger)
+    {
+        ArgumentNullException.ThrowIfNull(repository);
+        ArgumentNullException.ThrowIfNull(diffEngine);
+        ArgumentNullException.ThrowIfNull(pseudonymizer);
+        ArgumentNullException.ThrowIfNull(deadLetterStore);
+        ArgumentNullException.ThrowIfNull(pipelineProvider);
+        ArgumentNullException.ThrowIfNull(logger);
+
+        _repository = repository;
+        _diffEngine = diffEngine;
+        _pseudonymizer = pseudonymizer;
+        _deadLetterStore = deadLetterStore;
+        _logger = logger;
+        _savePipeline = pipelineProvider.GetPipeline(ResiliencePipelines.AuditSave);
+    }
+
     public async Task<Result<AuditEntryResponse>> IngestAsync(
         IngestEventRequest request,
         CancellationToken cancellationToken = default)
@@ -18,10 +46,10 @@ public sealed class AuditService(
 
         var id = request.EventId ?? Guid.NewGuid();
 
-        var existing = await repository.FindByIdAsync(id, cancellationToken);
+        var existing = await _repository.FindByIdAsync(id, cancellationToken);
         if (existing is not null)
         {
-            logger.LogWarning("Duplicate audit event rejected {EventId}", id);
+            _logger.LogWarning("Duplicate audit event rejected {EventId}", id);
             return Result<AuditEntryResponse>.Failure(
                 $"An event with ID '{id}' already exists.",
                 ResultErrorType.Conflict);
@@ -33,7 +61,7 @@ public sealed class AuditService(
         else if (request.Before is not null && request.After is null)
             payload = request.Before.ToJsonString();
         else if (request.Before is not null && request.After is not null)
-            payload = diffEngine.Compute(request.Before, request.After);
+            payload = _diffEngine.Compute(request.Before, request.After);
         else
             return Result<AuditEntryResponse>.Failure(
                 "At least one of 'Before' or 'After' must be provided.",
@@ -50,14 +78,43 @@ public sealed class AuditService(
             Payload = payload
         };
 
-        await repository.SaveAsync(entry, cancellationToken);
+        try
+        {
+            await _savePipeline.ExecuteAsync(
+                async ct => await _repository.SaveAsync(entry, ct), cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // Caller cancelled — not a store failure; preserve cancellation semantics.
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // Dead-letter capture is the durability backstop — must complete even if the
+            // caller's token is cancelled between the store failure and this write.
+            await _deadLetterStore.AppendAsync(
+                new DeadLetterEntry
+                {
+                    FailedAt = DateTimeOffset.UtcNow,
+                    Reason = $"{ex.GetType().Name}: {ex.Message}",
+                    Event = request
+                },
+                CancellationToken.None);
 
-        logger.LogInformation(
+            _logger.LogError(ex,
+                "Audit event {EventId} routed to dead letter after retries exhausted", id);
+
+            return Result<AuditEntryResponse>.Failure(
+                "The audit store is temporarily unavailable; the event was captured for retry.",
+                ResultErrorType.ServiceUnavailable);
+        }
+
+        _logger.LogInformation(
             "Audit event ingested {EventId} by actor {ActorIdHash} for {ResourceType}/{ResourceIdHash}",
             id,
-            pseudonymizer.Pseudonymize(request.ActorId),
+            _pseudonymizer.Pseudonymize(request.ActorId),
             request.ResourceType,
-            pseudonymizer.Pseudonymize(request.ResourceId));
+            _pseudonymizer.Pseudonymize(request.ResourceId));
 
         return Result<AuditEntryResponse>.Success(AuditEntryResponse.From(entry));
     }
@@ -85,11 +142,11 @@ public sealed class AuditService(
             : ("resource_type", resourceType!);
 
         IReadOnlyList<AuditEntry> entries = hasActor
-            ? await repository.SearchByActorAsync(filterValue, cancellationToken)
-            : await repository.SearchByResourceTypeAsync(filterValue, cancellationToken);
+            ? await _repository.SearchByActorAsync(filterValue, cancellationToken)
+            : await _repository.SearchByResourceTypeAsync(filterValue, cancellationToken);
 
-        var logValue = hasActor ? pseudonymizer.Pseudonymize(filterValue) : filterValue;
-        logger.LogInformation(
+        var logValue = hasActor ? _pseudonymizer.Pseudonymize(filterValue) : filterValue;
+        _logger.LogInformation(
             "Audit search completed. Filter={Filter} Value={Value} Count={Count}",
             filterName, logValue, entries.Count);
 

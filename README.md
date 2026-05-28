@@ -49,7 +49,7 @@ Features__UseStubRepository=true
 | Key | Default | Description |
 |---|---|---|
 | `Storage:AuditFilePath` | `audit_store.json` | Path to the newline-delimited JSON audit store (used when `UseStubRepository=false`) |
-| `Storage:DeadLetterFilePath` | `dead_letter_events.json` | Path to the dead-letter file for events that fail after retries (used from v0.5.0) |
+| `Storage:DeadLetterFilePath` | `dead_letter_events.json` | Path to the newline-delimited JSON dead-letter file. Events that still fail after the retry pipeline is exhausted are appended here as `{ failedAt, reason, event }` so they can be inspected and replayed. |
 
 ### Logging
 
@@ -91,7 +91,9 @@ Ingest a new audit event. Supply an optional `EventId` (UUID) for idempotent ret
 - Omit `after` for delete events (payload will be the full `before` object).
 - Supply both for update events (payload will be a structured field-level diff).
 
-**Responses:** `201 Created` · `400 Bad Request` · `409 Conflict`
+If the audit store fails, the write is retried once (200ms delay). If it still fails, the event is captured in the dead-letter file (`Storage:DeadLetterFilePath`) and the caller receives `503 Service Unavailable` — no submitted event is silently dropped.
+
+**Responses:** `201 Created` · `400 Bad Request` · `409 Conflict` · `503 Service Unavailable`
 
 ### GET /api/v1/audit
 
